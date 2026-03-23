@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+
+
+<head>
+
+    <title>SafeCampus Dashboard</title>
+
+    <link rel="stylesheet" href="style.css">
+
+    <script src="script.js"></script>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        #alertBanner{
+        animation: blink 1s infinite;
+        font-weight:bold;
+        }
+        @keyframes blink{
+        0%{opacity:1;}
+        50%{opacity:0.3;}
+        100%{opacity:1;}
+        }
+    </style>
+
+</head>
+
+<body>
+
+<script>
+    // 🔐 Protect Page
+    if(localStorage.getItem("loggedIn")!="true"){
+    window.location.href="/login.html";
+    }
+</script>
+
+<!-- 🔊 ALERT SOUND -->
+<audio id="alertSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+
+<!-- NAVBAR -->
+<nav class="navbar navbar-dark bg-dark">
+    <div class="container-fluid">
+        <span class="navbar-brand">🚨 SafeCampus Dashboard</span>
+        <button class="btn btn-danger" onclick="logout()">Logout</button>
+    </div>
+</nav>
+
+<!-- ALERT -->
+<div id="alertBanner" class="alert alert-danger text-center" style="display:none;">
+    🚨 Emergency Alert!
+</div>
+
+<!-- CARDS -->
+<div class="container mt-4">
+    <div class="row">
+
+        <div class="col-md-4">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5>Total Disasters</h5>
+                    <h2 id="disasterCount">0</h2>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5>System Status</h5>
+                    <p>Monitoring Campus</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<!-- REPORT -->
+<div class="container mt-4">
+
+    <h3>🚨 Report Disaster</h3>
+
+    <div class="row">
+        <div class="col-md-3"><input id="type" class="form-control" placeholder="Type"></div>
+        <div class="col-md-3"><input id="location" class="form-control" placeholder="Location"></div>
+        <div class="col-md-4"><input id="description" class="form-control" placeholder="Description"></div>
+        <div class="col-md-2"><button class="btn btn-danger" onclick="reportDisaster()">Report</button></div>
+    </div>
+
+</div>
+
+<!-- SEARCH -->
+<div class="container mt-4">
+    <input type="text" id="search" class="form-control" placeholder="Search Location">
+</div>
+
+<!-- TABLE -->
+<div class="container mt-3">
+
+    <table class="table table-bordered" id="table">
+        <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Location</th>
+            <th>Description</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </table>
+
+</div>
+
+<!-- CHART -->
+<div class="container mt-5">
+    <h3>📊 Statistics</h3>
+    <canvas id="chart"></canvas>
+</div>
+
+<script>
+
+    let previousCount = 0;
+
+    function logout(){
+    localStorage.removeItem("loggedIn");
+    window.location.href="/login.html";
+    }
+
+    function reportDisaster(){
+
+    fetch("/disaster/report",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+    disasterType:document.getElementById("type").value,
+    location:document.getElementById("location").value,
+    description:document.getElementById("description").value
+    })
+    })
+    .then(res=>res.json())
+    .then(()=>{
+    alert("Reported!");
+    loadAll();
+    });
+
+    }
+
+    function loadAll(){
+    loadDisasters();
+    loadCount();
+    loadChart();
+    }
+
+    function loadDisasters(){
+
+    fetch("/disaster/all")
+    .then(res=>res.json())
+    .then(data=>{
+
+    let table=document.getElementById("table");
+    let search=document.getElementById("search").value.toLowerCase();
+
+    table.innerHTML="<tr><th>ID</th><th>Type</th><th>Location</th><th>Description</th><th>Status</th><th>Action</th></tr>";
+
+    data.forEach(d=>{
+
+    if(d.location.toLowerCase().includes(search)){
+
+    table.innerHTML+=`
+    <tr>
+    <td>${d.id}</td>
+    <td>${d.disasterType}</td>
+    <td>${d.location}</td>
+    <td>${d.description}</td>
+    <td>${d.status}</td>
+    <td>
+    <button onclick="resolve(${d.id})" class="btn btn-success btn-sm">Resolve</button>
+    </td>
+    </tr>`;
+
+    }
+
+    });
+
+    });
+
+    }
+
+    function resolve(id){
+
+    fetch("/disaster/resolve/"+id,{method:"PUT"})
+    .then(()=>loadAll());
+
+    }
+
+    function loadCount(){
+
+    fetch("/disaster/all")
+    .then(res=>res.json())
+    .then(data=>{
+
+    let count=data.length;
+    document.getElementById("disasterCount").innerText=count;
+
+    if(count>previousCount){
+
+    document.getElementById("alertBanner").style.display="block";
+    document.getElementById("alertSound").play();
+    alert("🚨 New Disaster!");
+
+    }
+
+    previousCount=count;
+
+    });
+
+    }
+
+    function loadChart(){
+
+    fetch("/disaster/all")
+    .then(res=>res.json())
+    .then(data=>{
+
+    let fire=0,flood=0,other=0;
+
+    data.forEach(d=>{
+    if(d.disasterType=="Fire") fire++;
+    else if(d.disasterType=="Flood") flood++;
+    else other++;
+    });
+
+    new Chart(document.getElementById("chart"),{
+    type:"bar",
+    data:{
+    labels:["Fire","Flood","Other"],
+    datasets:[{data:[fire,flood,other]}]
+    }
+    });
+
+    });
+
+    }
+
+    setInterval(loadAll,10000);
+
+    loadAll();
+
+</script>
+
+</body>
+</html>

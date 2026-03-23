@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <title>SafeCampus Admin Panel</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+
+<body>
+
+<h1>📊 SafeCampus Analytics</h1>
+
+<canvas id="disasterChart"></canvas>
+
+<script>
+
+    fetch("/analytics/types")
+    .then(res=>res.json())
+    .then(data=>{
+
+    const labels = Object.keys(data);
+    const values = Object.values(data);
+
+    new Chart(document.getElementById("disasterChart"),{
+
+    type:"bar",
+
+    data:{
+    labels:labels,
+    datasets:[{
+    label:"Disaster Count",
+    data:values
+    }]
+    }
+
+    });
+
+    });
+
+</script>
+
+</body>
+</html>
